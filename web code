@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Home Energy Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <!-- Navbar -->
+  <nav class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <span class="text-blue-600">⚡</span>
+        <h1 class="text-xl font-semibold">Home Energy Monitor</h1>
+      </div>
+      <div class="flex space-x-4">
+        <button class="text-gray-700 hover:text-blue-600">Dashboard</button>
+        <button class="text-gray-700 hover:text-blue-600">Settings</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Current Power Consumption -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold flex items-center space-x-2">
+        <span class="text-blue-600">⚡</span><span>Current Power Consumption</span>
+      </h2>
+      <p class="text-sm text-gray-500 mb-4">Real-time energy usage</p>
+      <div class="text-4xl text-center font-bold mb-4" id="currentPower">-- Watts</div>
+      <canvas id="lineChart" height="200"></canvas>
+    </div>
+
+    <!-- Detected Appliances -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold flex items-center space-x-2">
+        <span class="text-green-600">🔌</span><span>Detected Appliances</span>
+      </h2>
+      <p class="text-sm text-gray-500 mb-4">Currently active devices</p>
+      <div id="applianceList" class="space-y-3"></div>
+    </div>
+
+    <!-- Recent Faults -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold flex items-center space-x-2">
+        <span class="text-red-600">⚠️</span><span>Recent Faults</span>
+      </h2>
+      <p class="text-sm text-gray-500 mb-4">System alerts and warnings</p>
+      <div id="faultList" class="space-y-3"></div>
+    </div>
+
+    <!-- System Status -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold">System Status</h2>
+      <p class="text-sm text-gray-500 mb-4">Monitor and control your system</p>
+      <div class="space-y-2 mb-4">
+        <div class="flex justify-between"><span>Monitoring:</span><span class="text-green-600 font-semibold">Active</span></div>
+        <div class="flex justify-between"><span>Last Update:</span><span id="lastUpdate">--</span></div>
+      </div>
+      <button id="simulateBtn" class="w-full bg-blue-600 text-white rounded p-2 hover:bg-blue-700">Simulate New Readings</button>
+    </div>
+
+    <!-- Device Health -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold">Device Health Overview</h2>
+      <p class="text-sm text-gray-500 mb-4">Status of connected devices</p>
+      <canvas id="healthChart" height="200"></canvas>
+    </div>
+
+    <!-- Energy Breakdown -->
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold">Energy Consumption Breakdown</h2>
+      <p class="text-sm text-gray-500 mb-4">Power usage by appliance</p>
+      <canvas id="breakdownChart" height="200"></canvas>
+    </div>
+  </main>
+
+  <!-- JavaScript -->
+  <script>
+    let appliances = []
+    let faults = []
+
+    const randomStatus = () => ['active', 'idle', 'off'][Math.floor(Math.random() * 3)]
+    const randomSeverity = () => ['low', 'medium', 'high'][Math.floor(Math.random() * 3)]
+    const getStatusColor = status => ({
+      active: 'bg-green-100 text-green-800',
+      idle: 'bg-yellow-100 text-yellow-800',
+      off: 'bg-gray-100 text-gray-800'
+    }[status] || 'bg-gray-100 text-gray-800')
+
+    const getSeverityColor = severity => ({
+      high: 'bg-red-100 text-red-800',
+      medium: 'bg-yellow-100 text-yellow-800',
+      low: 'bg-blue-100 text-blue-800'
+    }[severity] || 'bg-gray-100 text-gray-800')
+
+    const generateAppliances = () => {
+      const names = ['Fridge', 'AC', 'Washing Machine', 'TV', 'Oven', 'Microwave']
+      return names.map(name => ({
+        id: name,
+        name,
+        powerUsage: Math.floor(Math.random() * 4000),
+        status: randomStatus(),
+        lastSeen: new Date().toLocaleTimeString()
+      }))
+    }
+
+    const generateFaults = () => {
+      const highPowerAppliances = appliances.filter(a => a.powerUsage > 2500)
+      return highPowerAppliances.map(appliance => ({
+        id: Math.random().toString(36).substr(2),
+        message: 'High power surge detected',
+        severity: randomSeverity(),
+        timestamp: new Date().toLocaleTimeString(),
+        appliance: appliance.name
+      }))
+    }
+
+    const generateReadings = () => Array.from({length: 24}, (_, i) => ({
+      timestamp: `${i}:00`,
+      power: Math.floor(Math.random() * 4000 + 500)
+    }))
+
+    const updateDashboard = () => {
+      const currentPower = Math.floor(Math.random() * 5000 + 1000)
+      document.getElementById('currentPower').textContent = `${currentPower} Watts`
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString()
+
+      // Appliances
+      appliances = generateAppliances()
+      const applianceDiv = document.getElementById('applianceList')
+      applianceDiv.innerHTML = ''
+      appliances.forEach(app => {
+        applianceDiv.innerHTML += `
+          <div class="flex justify-between items-center p-2 border rounded ${getStatusColor(app.status)}">
+            <div>
+              <p class="font-medium">${app.name}</p>
+              <p class="text-sm text-gray-500">Last seen: ${app.lastSeen}</p>
+            </div>
+            <div class="text-right">
+              <span class="text-sm font-semibold">${app.powerUsage} W</span>
+            </div>
+          </div>
+        `
+      })
+
+      // Faults
+      faults = [...generateFaults(), ...faults].slice(0, 5)
+      const faultDiv = document.getElementById('faultList')
+      faultDiv.innerHTML = ''
+      faults.forEach(fault => {
+        faultDiv.innerHTML += `
+          <div class="p-2 border rounded ${getSeverityColor(fault.severity)}">
+            <p class="font-medium">${fault.message}</p>
+            <p class="text-sm">Appliance: ${fault.appliance || 'N/A'}</p>
+            <p class="text-xs">${fault.timestamp}</p>
+          </div>
+        `
+      })
+
+      updateCharts()
+    }
+
+    let lineChart, healthChart, breakdownChart
+
+    const updateCharts = () => {
+      const readings = generateReadings()
+
+      // Power Consumption Line Chart
+      const ctx1 = document.getElementById('lineChart').getContext('2d')
+      if (lineChart) lineChart.destroy()
+      lineChart = new Chart(ctx1, {
+        type: 'line',
+        data: {
+          labels: readings.map(r => r.timestamp),
+          datasets: [{
+            label: 'Power (W)',
+            data: readings.map(r => r.power),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      })
+
+      // Device Health - Pie Chart
+      const ctx2 = document.getElementById('healthChart').getContext('2d')
+      if (healthChart) healthChart.destroy()
+      healthChart = new Chart(ctx2, {
+        type: 'pie',
+        data: {
+          labels: appliances.map(a => a.name),
+          datasets: [{
+            label: 'Power Usage (W)',
+            data: appliances.map(a => a.powerUsage),
+            backgroundColor: ['#60a5fa', '#818cf8', '#f472b6', '#fbbf24', '#34d399', '#f87171']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'right'
+            }
+          }
+        }
+      })
+
+      // Energy Breakdown - Bar Chart
+      const ctx3 = document.getElementById('breakdownChart').getContext('2d')
+      if (breakdownChart) breakdownChart.destroy()
+      breakdownChart = new Chart(ctx3, {
+        type: 'bar',
+        data: {
+          labels: appliances.map(a => a.name),
+          datasets: [{
+            label: 'Watts',
+            data: appliances.map(a => a.powerUsage),
+            backgroundColor: '#82ca9d'
+          }]
+        }
+      })
+    }
+
+    document.getElementById('simulateBtn').addEventListener('click', updateDashboard)
+    updateDashboard()
+    setInterval(updateDashboard, 10000)
+  </script>
+</body>
+</html>
